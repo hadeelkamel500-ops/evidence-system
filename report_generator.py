@@ -1,3 +1,8 @@
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from arabic_reshaper import reshape
+from bidi.algorithm import get_display
+from reportlab.lib.styles import ParagraphStyle
 from io import BytesIO
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -12,8 +17,10 @@ import os
 # سنستخدم خط افتراضي مدعوم أو نتأكد من توفره
 FONT_NAME = "Helvetica"  # افتراضي إنجليزي، وللعرّبي سنستخدم معالجة أو خط إذا توفر
 # للتبسيط والموثوقية للمبتدئين، سنقوم بمعالجة النصوص العربية بصرياً، وإذا أردتِ خطاً عربياً خاصاً يمكنك إضافته لاحقاً.
-
-
+# تسجيل خط عربي (تأكدي من رفع ملف خط بصيغة ttf مثل Cairo-Regular.ttf أو Amiri-Regular.ttf إلى مجلد المشروع على GitHub بجانب الكود)
+pdfmetrics.registerFont(TTFont('ArabicFont', 'Cairo-Regular.ttf'))
+# مثال عند إضافة نص لتقرير الـ PDF:
+title_text = fix_arabic("تقرير سجل الأدلة الرقمية")
 def fix_arabic(text):
   """معالجة النص العربي ليظهر بشكل صحيح ومتصل في الـ PDF"""
   if not text:
@@ -35,6 +42,12 @@ def generate_evidence_pdf(evidence_record, chain_logs):
       bottomMargin=30,
   )
   elements = []
+arabic_style = ParagraphStyle(
+    'ArabicStyle',
+    fontName='ArabicFont',
+    fontSize=12,
+    alignment=2  # محاذاة النص لليمين
+)
 
   # استيراد أنماط النصوص
   from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -57,7 +70,11 @@ def generate_evidence_pdf(evidence_record, chain_logs):
       alignment=1,  # الوسط
       spaceAfter=20,
   )
-
+def fix_arabic(text):
+    if not text:
+        return ""
+    reshaped_text = reshape(str(text))
+    return get_display(reshaped_text)
   # عنوان التقرير
   elements.append(
       Paragraph(
