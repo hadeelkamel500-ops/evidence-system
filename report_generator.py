@@ -1,7 +1,6 @@
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from arabic_reshaper import reshape
-from bidi.algorithm import get_display
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -9,16 +8,16 @@ from reportlab.lib import colors
 from io import BytesIO
 import os
 
-# تسجيل الخط العربي الذي قمتِ برفعه (تأكدي أن اسم الملف المطابق لما رفعتِيه في المجلد الرئيسي)
+# تسجيل الخط العربي الذي قمتِ برفعه
 FONT_FILE = "ArbFONTS-CairoPlay-SemiBold.ttf"
 pdfmetrics.registerFont(TTFont('ArabicFont', FONT_FILE))
 
 def fix_arabic(text):
-    """معالجة النص العربي ليظهر بشكل صحيح ومتصل في الـ PDF"""
+    """معالجة النص العربي ليظهر بشكل متصل وصحيح بدون عكس اتجاه الجملة"""
     if not text:
         return ""
-    reshaped_text = reshape(str(text))
-    return get_display(reshaped_text)
+    # استخدام الـ reshape فقط لكي تتعامل ReportLab مع اتجاه النص بشكل سليم
+    return reshape(str(text))
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
@@ -102,7 +101,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
     elements.append(Spacer(1, 15))
     elements.append(Paragraph(fix_arabic("--- سجل سلسلة الحيازة ---"), arabic_style))
 
-    # جدول سجلات الحيازة (تمت إضافة FONTNAME 'ArabicFont' لكل خلايا الجدول)
+    # جدول سجلات الحيازة
     table_data = [[
         fix_arabic("ملاحظات"),
         fix_arabic("الحالة"),
