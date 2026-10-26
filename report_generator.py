@@ -1,6 +1,7 @@
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from arabic_reshaper import reshape
+from bidi.algorithm import get_display
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -13,11 +14,16 @@ FONT_FILE = "ArbFONTS-CairoPlay-SemiBold.ttf"
 pdfmetrics.registerFont(TTFont('ArabicFont', FONT_FILE))
 
 def fix_arabic(text):
-    """معالجة النص العربي ليظهر بشكل متصل وصحيح بدون عكس اتجاه الجملة"""
+    """معالجة النص العربي ليظهر متصلاً وبالاتجاه الصحيح تماماً"""
     if not text:
         return ""
-    # استخدام الـ reshape فقط لكي تتعامل ReportLab مع اتجاه النص بشكل سليم
-    return reshape(str(text))
+    text_str = str(text)
+    try:
+        reshaped_text = reshape(text_str)
+        bidi_text = get_display(reshaped_text)
+        return bidi_text
+    except Exception:
+        return text_str
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
