@@ -1,7 +1,6 @@
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from arabic_reshaper import reshape
-from bidi.algorithm import get_display
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -14,16 +13,22 @@ FONT_FILE = "ArbFONTS-CairoPlay-SemiBold.ttf"
 pdfmetrics.registerFont(TTFont('ArabicFont', FONT_FILE))
 
 def fix_arabic(text):
-    """معالجة النص العربي ليظهر متصلاً وبالاتجاه الصحيح تماماً"""
+    """معالجة النص العربي ليعمل بشكل مثالي ومضبوط الاتجاه في ReportLab"""
     if not text:
         return ""
+    
     text_str = str(text)
-    try:
-        reshaped_text = reshape(text_str)
-        bidi_text = get_display(reshaped_text)
-        return bidi_text
-    except Exception:
-        return text_str
+    
+    # إذا كان النص يحتوي على أرقام أو إنجليزية مع العربية (مثل الـ Hash أو التاريخ)، نتركه كما هو مع الـ reshape
+    if any(char.isdigit() for char in text_str) or any(ord(char) < 128 for char in text_str if char.isalpha()):
+        return reshape(text_str)
+    
+    # للنصوص العربية الخالصة: نعكس ترتيب الكلمات ونعالج الحروف لتظهر بالاتجاه الصحيح
+    words = text_str.split(' ')
+    reversed_words = words[::-1]  # عكس ترتيب الكلمات
+    joined_text = ' '.join(reversed_words)
+    
+    return reshape(joined_text)
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
@@ -43,7 +48,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
     # تعريف أنماط النصوص بالخط العربي الجديد والمحاذاة الصحيحة لليمين
     arabic_style = ParagraphStyle(
         name="ArabicStyle",
-        fontName="ArabicFont",  # استخدام الخط العربي المسجل
+        fontName="ArabicFont",
         fontSize=11,
         alignment=2,  # محاذاة لليمين
         spaceAfter=6,
@@ -51,7 +56,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
 
     title_style = ParagraphStyle(
         name="TitleStyle",
-        fontName="ArabicFont",  # استخدام الخط العربي المسجل
+        fontName="ArabicFont",
         fontSize=16,
         alignment=1,  # في المنتصف
         spaceAfter=15,
@@ -130,7 +135,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
         TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, -1), "ArabicFont"),  # استخدام الخط العربي للجدول
+            ("FONTNAME", (0, 0), (-1, -1), "ArabicFont"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
