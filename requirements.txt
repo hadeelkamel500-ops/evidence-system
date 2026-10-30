@@ -1,0 +1,4 @@
+reportlab
+arabic-reshaper
+python-bidi
+fonttools
