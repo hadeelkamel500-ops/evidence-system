@@ -1,31 +1,34 @@
+import os
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from arabic_reshaper import reshape
 from bidi.algorithm import get_display
 from xml.sax.saxutils import escape
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.enums import TA_RIGHT, TA_CENTER
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from reportlab.lib import colors
-from io import BytesIO
-import os
 
-# تسجيل الخط العربي
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FONT_FILE = os.path.join(BASE_DIR, "ArbFONTS-CairoPlay-SemiBold.ttf")
+FONT_FILE = os.path.join(BASE_DIR, "IBMPlexSansArabic-Regular.ttf")
 pdfmetrics.registerFont(TTFont("ArabicFont", FONT_FILE))
 
 
 def fix_arabic(text):
-    """تجهيز النص العربي للطباعة: هروب رموز XML ثم تشكيل الحروف ثم ترتيب الاتجاه."""
+    """تشكيل الحروف ثم ترتيب الاتجاه، مع هروب رموز XML."""
     if text is None:
         return ""
     value = str(text).strip()
     if not value:
         return ""
     return get_display(reshape(escape(value)))
+from fontTools.ttLib import TTFont as FTFont
 
+_FONT_CMAP = set()
+for _table in FTFont(FONT_FILE)["cmap"].tables:
+    _FONT_CMAP |= set(_table.cmap.keys())
+
+
+def assert_font_covers(text):
+    missing = sorted({c for c in fix_arabic(text) if ord(c) > 31 and ord(c) not in _FONT_CMAP})
+    if missing:
+        raise ValueError("أحرف غير موجودة في الخط: " + ", ".join(f"{c} U+{ord(c):04X}" for c in missing))
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
