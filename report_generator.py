@@ -1,46 +1,55 @@
-from io import BytesIO
 import os
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_RIGHT, TA_CENTER
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
+from xml.sax.saxutils import escape
+
 from arabic_reshaper import reshape
 from bidi.algorithm import get_display
-from xml.sax.saxutils import escape
+from fontTools.ttLib import TTFont as FTFont
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_FILE = os.path.join(BASE_DIR, "IBMPlexSansArabic-Regular.ttf")
+
 pdfmetrics.registerFont(TTFont("ArabicFont", FONT_FILE))
 
 
 def fix_arabic(text):
-    """تشكيل الحروف ثم ترتيب الاتجاه، مع هروب رموز XML."""
+    """تشكيل الحروف ثم ترتيب الاتجاه، ثم هروب رموز XML (بهذا الترتيب)."""
     if text is None:
         return ""
     value = str(text).strip()
     if not value:
         return ""
-    return get_display(reshape(escape(value)))
+    return escape(get_display(reshape(value)))
 
 
-from fontTools.ttLib import TTFont as FTFont
-
+# الحروف المدعومة في الخط
 _FONT_CMAP = set()
 for _table in FTFont(FONT_FILE)["cmap"].tables:
     _FONT_CMAP |= set(_table.cmap.keys())
 
 
 def assert_font_covers(text):
-    missing = sorted({c for c in fix_arabic(text) if ord(c) > 31 and ord(c) not in _FONT_CMAP})
+    shaped = get_display(reshape(str(text)))
+    missing = sorted({c for c in shaped if ord(c) > 31 and ord(c) not in _FONT_CMAP})
     if missing:
-        raise ValueError("أحرف غير موجودة في الخط: " + ", ".join(f"{c} U+{ord(c):04X}" for c in missing))
+        raise ValueError(
+            "أحرف غير موجودة في الخط: " + ", ".join(f"{c} U+{ord(c):04X}" for c in missing)
+        )
 
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
+    # تحويل sqlite3.Row (أو أي كائن مشابه) إلى dict حتى يعمل .get()
+    evidence_record = dict(evidence_record)
+    chain_logs = [dict(log) for log in chain_logs]
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -50,6 +59,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
         topMargin=30,
         bottomMargin=30,
     )
+
     elements = []
 
     arabic_style = ParagraphStyle(
@@ -59,6 +69,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
         leading=17,
         alignment=TA_RIGHT,
         spaceAfter=6,
+        wordWrap="CJK",  # لكسر النصوص الطويلة مثل البصمة
     )
 
     title_style = ParagraphStyle(
@@ -76,6 +87,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
         fontSize=8,
         leading=11,
         alignment=TA_RIGHT,
+        wordWrap="CJK",
     )
 
     head_cell_style = ParagraphStyle(
@@ -104,7 +116,7 @@ def generate_evidence_pdf(evidence_record, chain_logs):
     elements.append(Spacer(1, 15))
     elements.append(Paragraph(fix_arabic("--- سجل سلسلة الحيازة ---"), arabic_style))
 
-    # جدول سجلات الحيازة
+    # العمود الأول (ملاحظات) في أقصى اليسار، والوقت في أقصى اليمين
     table_data = [[
         cell("ملاحظات", head_cell_style),
         cell("الحالة", head_cell_style),
@@ -138,3 +150,4 @@ def generate_evidence_pdf(evidence_record, chain_logs):
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
