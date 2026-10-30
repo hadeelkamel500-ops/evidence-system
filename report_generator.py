@@ -1,5 +1,10 @@
 from io import BytesIO
 import os
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from arabic_reshaper import reshape
@@ -19,6 +24,8 @@ def fix_arabic(text):
     if not value:
         return ""
     return get_display(reshape(escape(value)))
+
+
 from fontTools.ttLib import TTFont as FTFont
 
 _FONT_CMAP = set()
@@ -30,6 +37,7 @@ def assert_font_covers(text):
     missing = sorted({c for c in fix_arabic(text) if ord(c) > 31 and ord(c) not in _FONT_CMAP})
     if missing:
         raise ValueError("أحرف غير موجودة في الخط: " + ", ".join(f"{c} U+{ord(c):04X}" for c in missing))
+
 
 def generate_evidence_pdf(evidence_record, chain_logs):
     """إنشاء تقرير PDF للدليل وسجل الحيازة الخاص به"""
@@ -43,8 +51,6 @@ def generate_evidence_pdf(evidence_record, chain_logs):
         bottomMargin=30,
     )
     elements = []
-
-    styles = getSampleStyleSheet()
 
     arabic_style = ParagraphStyle(
         name="ArabicStyle",
@@ -88,17 +94,17 @@ def generate_evidence_pdf(evidence_record, chain_logs):
 
     # بيانات الدليل الأساسية
     elements.append(Paragraph(fix_arabic("--- بيانات الدليل الأساسية ---"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"رقم الدليل: {evidence_record['evidence_id']}"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"اسم الملف: {evidence_record['file_name']}"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"حجم الملف (بايت): {evidence_record['file_size_bytes']}"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"البصمة الأصلية (SHA-256): {evidence_record['original_hash']}"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"اسم المسجل: {evidence_record['registered_by']}"), arabic_style))
-    elements.append(Paragraph(fix_arabic(f"تاريخ التسجيل: {evidence_record['created_at']}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"رقم الدليل: {evidence_record.get('evidence_id', '')}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"اسم الملف: {evidence_record.get('file_name', '')}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"حجم الملف (بايت): {evidence_record.get('file_size_bytes', '')}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"البصمة الأصلية (SHA-256): {evidence_record.get('original_hash', '')}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"اسم المسجل: {evidence_record.get('registered_by', '')}"), arabic_style))
+    elements.append(Paragraph(fix_arabic(f"تاريخ التسجيل: {evidence_record.get('created_at', '')}"), arabic_style))
 
     elements.append(Spacer(1, 15))
     elements.append(Paragraph(fix_arabic("--- سجل سلسلة الحيازة ---"), arabic_style))
 
-    # جدول سجلات الحيازة: العمود الأول (ملاحظات) يظهر في أقصى اليسار، والوقت في أقصى اليمين
+    # جدول سجلات الحيازة
     table_data = [[
         cell("ملاحظات", head_cell_style),
         cell("الحالة", head_cell_style),
